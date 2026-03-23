@@ -1,25 +1,28 @@
 /**
  * Parser for 12d Model HTML alignment reports.
  *
- * 12d outputs vary by report template. This parser attempts to identify
- * horizontal and vertical alignment tables by scanning for known header keywords,
- * then maps columns to data fields.
+ * Handles the standard 12d HTML output format with:
+ *   - Horizontal IPs table (PT, Chainage, Radius, A. Length, Defl. Angle, Leading, Trailing)
+ *   - Vertical IPs table (PT, Chainage, Height, VC Type, K Value, Radius, Length)
+ *
+ * Direction of horizontal curves is derived from the sign of the radius
+ * (negative = left, positive = right) rather than an L/R suffix on the angle.
+ * Grades are computed from adjacent VIP levels/chainages when not explicitly tabulated.
  */
 
 import type { AlignmentData, HorizontalIP, VerticalIP, GradeSection, SuperelevationPoint, DesignSpeed } from '../types/geometry'
 
 // ─── DMS parsing ─────────────────────────────────────────────────────────────
 
-/** Convert "15°30'45\" L" or "15-30-45 L" or "15.512 L" to signed decimal degrees */
-function parseDMS(raw: string): { degrees: number; direction: 'L' | 'R' } {
-  const dir: 'L' | 'R' = /L/i.test(raw) ? 'L' : 'R'
+/** Convert "35°12'33.84\"" or "15.512" to decimal degrees (strips any L/R suffix) */
+function parseDMSAngle(raw: string): number {
   const clean = raw.replace(/[LlRr°'"]/g, ' ').trim()
   const parts = clean.split(/[\s\-:]+/).filter(Boolean).map(Number)
   let deg = 0
   if (parts.length >= 1) deg += parts[0]
   if (parts.length >= 2) deg += parts[1] / 60
   if (parts.length >= 3) deg += parts[2] / 3600
-  return { degrees: deg, direction: dir }
+  return deg
 }
 
 /** Parse a chainage string like "0+350.00" or "350.00" to a number */
@@ -58,24 +61,24 @@ function findColIndex(headers: string[], ...candidates: string[]): number {
 
 // ─── Horizontal alignment parser ─────────────────────────────────────────────
 
-const HORIZ_HEADER_KEYWORDS = /radius|arc\s*length|deflect|tangent\s*length|curve\s*length/i
+// Matches 12d Horizontal IPs table: has Radius + one of the curve geometry columns
+const HORIZ_HEADER_KEYWORDS = /a\.\s*len|arc\s*len|defl.*angle|deflect|leading|trailing|tangent\s*len|curve\s*len/i
 
 function parseHorizontalTable(grid: CellGrid): HorizontalIP[] {
-  // Find the header row
   const headerRowIdx = grid.findIndex(row => HORIZ_HEADER_KEYWORDS.test(row.join(' ')))
   if (headerRowIdx === -1) return []
 
   const headers = grid[headerRowIdx]
   const c = {
-    id:          findColIndex(headers, 'ip\\s*no', 'point\\s*no', '^no$', 'id', 'point'),
-    chainage:    findColIndex(headers, 'chainage', 'chain', 'ch\\.'),
-    deflection:  findColIndex(headers, 'deflect', 'defl\\.', 'delta', 'angle'),
-    radius:      findColIndex(headers, 'radius', '^r$'),
-    arc:         findColIndex(headers, 'arc', 'curve\\s*len', 'arc\\s*len'),
-    tangent:     findColIndex(headers, 'tangent', '^t$', 'tan\\s*len'),
-    transIn:     findColIndex(headers, 'trans.*in', 'spiral.*in', 'ls.*in', 'l1'),
-    transOut:    findColIndex(headers, 'trans.*out', 'spiral.*out', 'ls.*out', 'l2'),
-    clothoid:    findColIndex(headers, 'clothoid', '^a$', 'param'),
+    id:         findColIndex(headers, '^pt$', 'ip\\s*no', 'point\\s*no', '^no$', 'id'),
+    chainage:   findColIndex(headers, '^chainage$', 'chainage', 'chain', 'ch\\.'),
+    deflection: findColIndex(headers, 'defl.*angle', 'deflect', 'defl\\.', 'delta'),
+    radius:     findColIndex(headers, '^radius$', '^r$'),
+    arc:        findColIndex(headers, 'a\\.\\s*len', '^arc$', 'arc\\s*len', 'curve\\s*len'),
+    tangent:    findColIndex(headers, 'tangent', '^t$', 'tan\\s*len'),
+    transIn:    findColIndex(headers, '^leading$', 'trans.*in', 'spiral.*in', 'ls.*in', 'l1'),
+    transOut:   findColIndex(headers, '^trailing$', 'trans.*out', 'spiral.*out', 'ls.*out', 'l2'),
+    clothoid:   findColIndex(headers, 'clothoid', '^a$', 'param'),
   }
 
   const ips: HorizontalIP[] = []
@@ -88,21 +91,25 @@ function parseHorizontalTable(grid: CellGrid): HorizontalIP[] {
     const chainage = parseChainage(chainageRaw)
     if (isNaN(chainage)) continue
 
-    const deflRaw = c.deflection !== -1 ? row[c.deflection] : '0'
-    const { degrees: deflAngle, direction: deflDir } = parseDMS(deflRaw || '0')
+    const radiusSigned = c.radius !== -1 ? parseNum(row[c.radius]) : 0
+    // Skip tangent-only rows (TC, CT, TS, ST points with no curve)
+    if (radiusSigned === 0) continue
 
-    const radius = c.radius !== -1 ? parseNum(row[c.radius]) : 0
-    if (radius === 0 && deflAngle === 0) continue  // likely a tangent start/end row
+    // 12d uses signed radius: negative = left-hand curve, positive = right-hand curve
+    const deflectionDirection: 'L' | 'R' = radiusSigned < 0 ? 'L' : 'R'
+    const radius = Math.abs(radiusSigned)
+
+    const deflAngle = parseDMSAngle(c.deflection !== -1 ? (row[c.deflection] || '0') : '0')
 
     ips.push({
-      id:               c.id !== -1 ? row[c.id] : `IP${ips.length + 1}`,
+      id:                  c.id !== -1 ? row[c.id] : `IP${ips.length + 1}`,
       chainage,
-      deflectionAngle:  deflAngle,
-      deflectionDirection: deflDir,
-      radius:           radius,
-      arcLength:        c.arc !== -1      ? parseNum(row[c.arc])     : 0,
-      tangentLength:    c.tangent !== -1  ? parseNum(row[c.tangent]) : 0,
-      transitionLengthIn:  c.transIn !== -1  ? parseNum(row[c.transIn])  : 0,
+      deflectionAngle:     deflAngle,
+      deflectionDirection,
+      radius,
+      arcLength:           c.arc     !== -1 ? parseNum(row[c.arc])     : 0,
+      tangentLength:       c.tangent !== -1 ? parseNum(row[c.tangent]) : 0,
+      transitionLengthIn:  c.transIn  !== -1 ? parseNum(row[c.transIn])  : 0,
       transitionLengthOut: c.transOut !== -1 ? parseNum(row[c.transOut]) : 0,
       clothoidParameter:   c.clothoid !== -1 ? parseNum(row[c.clothoid]) : undefined,
     })
@@ -112,7 +119,8 @@ function parseHorizontalTable(grid: CellGrid): HorizontalIP[] {
 
 // ─── Vertical alignment parser ────────────────────────────────────────────────
 
-const VERT_HEADER_KEYWORDS = /grade|k\s*value|vc\s*len|vertical\s*curve|v\.?c\.?l|vip/i
+// Matches 12d Vertical IPs table: has VC Type or K Value columns
+const VERT_HEADER_KEYWORDS = /vc\s*type|k\s*value|vc\s*len|vertical\s*curve|v\.?c\.?l/i
 
 function parseVerticalTable(grid: CellGrid): { vips: VerticalIP[]; grades: GradeSection[] } {
   const headerRowIdx = grid.findIndex(row => VERT_HEADER_KEYWORDS.test(row.join(' ')))
@@ -120,16 +128,24 @@ function parseVerticalTable(grid: CellGrid): { vips: VerticalIP[]; grades: Grade
 
   const headers = grid[headerRowIdx]
   const c = {
-    id:        findColIndex(headers, 'vip', 'ip\\s*no', 'point', '^no$'),
-    chainage:  findColIndex(headers, 'chainage', 'chain', 'ch\\.'),
-    level:     findColIndex(headers, 'level', 'elev', 'rl', 'height'),
-    gradeIn:   findColIndex(headers, 'grade\\s*in', 'in\\s*grade', 'g1', 'incoming'),
-    gradeOut:  findColIndex(headers, 'grade\\s*out', 'out\\s*grade', 'g2', 'outgoing'),
-    kValue:    findColIndex(headers, 'k\\s*val', '^k$'),
-    vcLength:  findColIndex(headers, 'vc\\s*len', 'vcl', 'curve\\s*len', 'l\\s*\\(vc\\)'),
+    id:       findColIndex(headers, '^pt$', 'vip', 'ip\\s*no', 'point', '^no$'),
+    chainage: findColIndex(headers, '^chainage$', 'chainage', 'chain', 'ch\\.'),
+    level:    findColIndex(headers, '^height$', 'level', 'elev', 'rl', 'height'),
+    vcType:   findColIndex(headers, 'vc\\s*type'),
+    kValue:   findColIndex(headers, 'k\\s*val', '^k$'),
+    vcRadius: findColIndex(headers, '^radius$'),
+    vcLength: findColIndex(headers, '^length$', 'vc\\s*len', 'vcl', 'curve\\s*len', 'l\\s*\\(vc\\)'),
+    gradeIn:  findColIndex(headers, 'grade\\s*in', 'in\\s*grade', 'g1', 'incoming'),
+    gradeOut: findColIndex(headers, 'grade\\s*out', 'out\\s*grade', 'g2', 'outgoing'),
   }
 
-  const vips: VerticalIP[] = []
+  interface RawVIP {
+    id: string; chainage: number; level: number
+    vcTypeStr: string; kValue: number; vcRadius: number; vcLength: number
+    gradeIn: number; gradeOut: number
+  }
+
+  const raw: RawVIP[] = []
   for (let r = headerRowIdx + 1; r < grid.length; r++) {
     const row = grid[r]
     if (row.length < 3 || row.every(c => c === '')) continue
@@ -138,31 +154,56 @@ function parseVerticalTable(grid: CellGrid): { vips: VerticalIP[]; grades: Grade
     const chainage = parseChainage(chainageRaw)
     if (isNaN(chainage)) continue
 
-    const gradeIn  = c.gradeIn  !== -1 ? parseNum(row[c.gradeIn])  : 0
-    const gradeOut = c.gradeOut !== -1 ? parseNum(row[c.gradeOut]) : 0
-    const kValue   = c.kValue   !== -1 ? parseNum(row[c.kValue])   : 0
-    const vcLength = c.vcLength !== -1 ? parseNum(row[c.vcLength]) : 0
-    const gradeChange = Math.abs(gradeOut - gradeIn)
-
-    let vcType: 'crest' | 'sag' | 'none' = 'none'
-    if (vcLength > 0) {
-      vcType = gradeOut < gradeIn ? 'crest' : 'sag'
-    }
-
-    vips.push({
-      id:          c.id !== -1 ? row[c.id] : `VIP${vips.length + 1}`,
+    raw.push({
+      id:        c.id       !== -1 ? row[c.id]              : `VIP${raw.length + 1}`,
       chainage,
-      level:       c.level !== -1 ? parseNum(row[c.level]) : 0,
-      gradeIn,
-      gradeOut,
-      gradeChange,
-      kValue,
-      vcLength,
-      vcType,
+      level:     c.level    !== -1 ? parseNum(row[c.level])    : 0,
+      vcTypeStr: c.vcType   !== -1 ? row[c.vcType].trim()      : '',
+      kValue:    c.kValue   !== -1 ? parseNum(row[c.kValue])   : 0,
+      vcRadius:  c.vcRadius !== -1 ? parseNum(row[c.vcRadius]) : 0,
+      vcLength:  c.vcLength !== -1 ? parseNum(row[c.vcLength]) : 0,
+      gradeIn:   c.gradeIn  !== -1 ? parseNum(row[c.gradeIn])  : 0,
+      gradeOut:  c.gradeOut !== -1 ? parseNum(row[c.gradeOut]) : 0,
     })
   }
 
-  // Derive grade sections from adjacent VIPs
+  // When no explicit grade columns, compute grades from adjacent VIP levels/chainages
+  if (c.gradeIn === -1 && raw.length >= 2) {
+    for (let i = 0; i < raw.length; i++) {
+      const prev = raw[i - 1]
+      const curr = raw[i]
+      const next = raw[i + 1]
+      const gradeFromPrev = prev ? (curr.level - prev.level) / (curr.chainage - prev.chainage) * 100 : undefined
+      const gradeToNext   = next ? (next.level - curr.level) / (next.chainage - curr.chainage) * 100 : undefined
+      curr.gradeIn  = gradeFromPrev ?? gradeToNext ?? 0
+      curr.gradeOut = gradeToNext   ?? gradeFromPrev ?? 0
+    }
+  }
+
+  const vips: VerticalIP[] = raw.map(v => {
+    const vcTypeStr = v.vcTypeStr.toLowerCase()
+    let vcType: 'crest' | 'sag' | 'none' = 'none'
+    if (v.vcLength > 0 && vcTypeStr !== 'line') {
+      if (v.vcRadius !== 0) {
+        // Positive radius = concave up = sag; negative = convex down = crest
+        vcType = v.vcRadius > 0 ? 'sag' : 'crest'
+      } else {
+        vcType = v.gradeOut < v.gradeIn ? 'crest' : 'sag'
+      }
+    }
+    return {
+      id:          v.id,
+      chainage:    v.chainage,
+      level:       v.level,
+      gradeIn:     v.gradeIn,
+      gradeOut:    v.gradeOut,
+      gradeChange: Math.abs(v.gradeOut - v.gradeIn),
+      kValue:      v.kValue,
+      vcLength:    v.vcLength,
+      vcType,
+    }
+  })
+
   const grades: GradeSection[] = []
   for (let i = 0; i < vips.length - 1; i++) {
     grades.push({
@@ -220,6 +261,13 @@ function extractDesignSpeed(doc: Document): DesignSpeed | undefined {
 }
 
 function extractAlignmentName(doc: Document): string {
+  // 12d reports use h3 with format "cen LME10->LME10 Horizontal IPs"
+  const h3 = doc.querySelector('h3')?.textContent?.trim()
+  if (h3) {
+    const m = h3.match(/cen\s+([^-\s>]+)/i)
+    if (m) return m[1]
+    return h3
+  }
   const title = doc.querySelector('title')?.textContent
   if (title) return title.trim()
   const h1 = doc.querySelector('h1, h2')?.textContent
@@ -248,7 +296,7 @@ export function parse12dHtml(htmlContent: string): AlignmentData {
     }
     if (verticalIPs.length === 0 && VERT_HEADER_KEYWORDS.test(grid.flat().join(' '))) {
       const result = parseVerticalTable(grid)
-      verticalIPs  = result.vips
+      verticalIPs   = result.vips
       gradeSections = result.grades
     }
     if (superelevation.length === 0 && SUPER_HEADER_KEYWORDS.test(grid.flat().join(' '))) {
