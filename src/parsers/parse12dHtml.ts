@@ -71,7 +71,7 @@ function parseHorizontalTable(grid: CellGrid): HorizontalIP[] {
   const headers = grid[headerRowIdx]
   const c = {
     id:         findColIndex(headers, '^pt$', 'ip\\s*no', 'point\\s*no', '^no$', 'id'),
-    chainage:   findColIndex(headers, '^chainage$', 'chainage', 'chain', 'ch\\.'),
+    chainage:   findColIndex(headers, 'raw\\s*ch', '^chainage$', 'chainage', 'chain', 'ch\\.'),
     deflection: findColIndex(headers, 'defl.*angle', 'deflect', 'defl\\.', 'delta'),
     radius:     findColIndex(headers, '^radius$', '^r$'),
     arc:        findColIndex(headers, 'a\\.\\s*len', '^arc$', 'arc\\s*len', 'curve\\s*len'),
@@ -129,7 +129,7 @@ function parseVerticalTable(grid: CellGrid): { vips: VerticalIP[]; grades: Grade
   const headers = grid[headerRowIdx]
   const c = {
     id:       findColIndex(headers, '^pt$', 'vip', 'ip\\s*no', 'point', '^no$'),
-    chainage: findColIndex(headers, '^chainage$', 'chainage', 'chain', 'ch\\.'),
+    chainage: findColIndex(headers, 'raw\\s*ch', '^chainage$', 'chainage', 'chain', 'ch\\.'),
     level:    findColIndex(headers, '^height$', 'level', 'elev', 'rl', 'height'),
     vcType:   findColIndex(headers, 'vc\\s*type'),
     kValue:   findColIndex(headers, 'k\\s*val', '^k$'),
@@ -226,7 +226,7 @@ function parseSuperelevationTable(grid: CellGrid): SuperelevationPoint[] {
 
   const headers = grid[headerRowIdx]
   const c = {
-    chainage: findColIndex(headers, 'chainage', 'chain', 'ch\\.'),
+    chainage: findColIndex(headers, 'raw\\s*ch', 'chainage', 'chain', 'ch\\.'),
     left:     findColIndex(headers, 'left', 'l\\.?rate', 'lhs'),
     right:    findColIndex(headers, 'right', 'r\\.?rate', 'rhs'),
   }

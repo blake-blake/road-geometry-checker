@@ -1,5 +1,5 @@
 import type { AlignmentData, CheckResult, DesignSpeed, Standard } from '../types/geometry'
-import { getKValue, getMaxGrade, MIN_GRADE, MIN_VCL } from '../standards/austroads'
+import { getKValue, getMaxGrade, MIN_GRADE, MIN_VCL, getMinVerticalTangent } from '../standards/austroads'
 
 let _id = 0
 const id = () => `v${++_id}`
@@ -43,6 +43,32 @@ export function checkVerticalAlignment(
       clause: 'AGRD03 Section 9.6',
       notes: absGrade < MIN_GRADE && absGrade > 0 ? 'Grade below 0.3% — drainage provisions required.' : undefined,
     })
+  }
+
+  // ── Vertical curve spacing ────────────────────────────────────────────────
+  for (let i = 1; i < verticalIPs.length; i++) {
+    const prev = verticalIPs[i - 1]
+    const curr = verticalIPs[i]
+    if (prev.vcLength === 0 && curr.vcLength === 0) continue
+
+    const tangentBetween = curr.chainage - curr.vcLength / 2 - (prev.chainage + prev.vcLength / 2)
+    const minT = getMinVerticalTangent(speed)
+
+    if (tangentBetween < minT.desirable) {
+      results.push({
+        id: id(),
+        category: 'Vertical Alignment',
+        element: `VIP ${curr.id}`,
+        check: 'Vertical curve spacing',
+        value: `Tangent = ${tangentBetween.toFixed(1)} m`,
+        limit: `≥ ${minT.absolute} m abs, ${minT.desirable} m desirable`,
+        status: tangentBetween < minT.absolute ? 'fail' : 'warning',
+        clause: 'AGRD03 Section 9.4',
+        notes: tangentBetween < 0
+          ? 'Vertical curves overlap.'
+          : 'Tangent between vertical curves is below the desirable minimum.',
+      })
+    }
   }
 
   // ── VIP / Vertical curve checks ───────────────────────────────────────────

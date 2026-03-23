@@ -64,6 +64,15 @@ export function getMinTransitionLength(
   return { absolute: Math.ceil(absolute), desirable: Math.ceil(desirable) }
 }
 
+/**
+ * Minimum tangent length between consecutive horizontal curves.
+ * Applies to both broken back (same direction) and reverse curves without transitions.
+ * Absolute = V m, desirable = 2V m. AGRD03 Section 7.5
+ */
+export function getMinTangentBetweenCurves(speed: DesignSpeed): { absolute: number; desirable: number } {
+  return { absolute: speed, desirable: speed * 2 }
+}
+
 // ─── Vertical Alignment ──────────────────────────────────────────────────────
 
 /** K values for crest vertical curves. Austroads AGRD03 Table 9.1 */
@@ -131,6 +140,14 @@ export function getSSD(speed: DesignSpeed): number {
 
 /** Minimum vertical curve length (general, not SSD-derived). 50 m practical minimum. */
 export const MIN_VCL = 50
+
+/**
+ * Minimum tangent between consecutive vertical curves for appearance and perception.
+ * Absolute = V m, desirable = 2V m. AGRD03 Section 9.4
+ */
+export function getMinVerticalTangent(speed: DesignSpeed): { absolute: number; desirable: number } {
+  return { absolute: speed, desirable: speed * 2 }
+}
 
 // ─── Superelevation ──────────────────────────────────────────────────────────
 

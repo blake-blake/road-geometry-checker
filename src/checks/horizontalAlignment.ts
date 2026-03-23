@@ -1,6 +1,6 @@
 import type { AlignmentData, CheckResult, DesignSpeed, Standard } from '../types/geometry'
 import {
-  getMinRadius, getMinCurveLength, getMinTransitionLength,
+  getMinRadius, getMinCurveLength, getMinTransitionLength, getMinTangentBetweenCurves,
 } from '../standards/austroads'
 
 let _id = 0
@@ -132,7 +132,54 @@ export function checkHorizontalAlignment(
       }
     }
 
-    // ── 6. Compound curves — radius ratio check ───────────────────────────────
+    // ── 6. Broken back / reverse curve ───────────────────────────────────────
+    if (i > 0) {
+      const prev = horizontalIPs[i - 1]
+      if (prev.radius > 0) {
+        // Estimate tangent length (T) from radius and deflection when not tabulated
+        const tPrev = prev.tangentLength > 0
+          ? prev.tangentLength
+          : prev.radius * Math.tan((prev.deflectionAngle / 2) * (Math.PI / 180))
+        const tCurr = ip.tangentLength > 0
+          ? ip.tangentLength
+          : ip.radius * Math.tan((ip.deflectionAngle / 2) * (Math.PI / 180))
+        const tangentBetween = ip.chainage - tCurr - (prev.chainage + tPrev)
+        const minT = getMinTangentBetweenCurves(speed)
+
+        if (prev.deflectionDirection === ip.deflectionDirection) {
+          // ── Broken back: same direction, tangent between them
+          results.push({
+            id: id(),
+            category: 'Horizontal Alignment',
+            element: label,
+            check: 'Broken back curve',
+            value: `Tangent ≈ ${tangentBetween.toFixed(1)} m (both ${ip.deflectionDirection})`,
+            limit: `Avoid; if unavoidable ≥ ${minT.desirable} m`,
+            status: tangentBetween < minT.absolute ? 'fail' : 'warning',
+            clause: 'AGRD03 Section 7.5',
+            notes: 'Broken back curves should be avoided. Consider compound curve or longer tangent.',
+          })
+        } else {
+          // ── Reverse curve: opposite directions
+          const hasTransitions = prev.transitionLengthOut > 0 && ip.transitionLengthIn > 0
+          if (!hasTransitions) {
+            results.push({
+              id: id(),
+              category: 'Horizontal Alignment',
+              element: label,
+              check: 'Reverse curve — tangent adequacy',
+              value: `Tangent ≈ ${tangentBetween.toFixed(1)} m`,
+              limit: `≥ ${minT.absolute} m abs, ${minT.desirable} m desirable`,
+              status: tangentBetween < minT.absolute ? 'fail' : tangentBetween < minT.desirable ? 'warning' : 'info',
+              clause: 'AGRD03 Section 7.5',
+              notes: 'Reverse curve without transitions — tangent required for superelevation reversal.',
+            })
+          }
+        }
+      }
+    }
+
+    // ── 7. Compound curves — radius ratio check ───────────────────────────────
     if (i > 0) {
       const prev = horizontalIPs[i - 1]
       if (prev.radius > 0 && ip.radius > 0) {

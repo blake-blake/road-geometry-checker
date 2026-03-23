@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { AlignmentData, CheckResult, CheckCategory, DesignSpeed, Standard } from './types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, Standard } from './types/geometry'
 import { parse12dHtml } from './parsers/parse12dHtml'
 import { checkHorizontalAlignment } from './checks/horizontalAlignment'
 import { checkVerticalAlignment } from './checks/verticalAlignment'
@@ -8,7 +8,8 @@ import { checkChainages } from './checks/chainages'
 import { FileUpload } from './components/FileUpload'
 import { DesignSpeedSelector } from './components/DesignSpeedSelector'
 import { CheckSummary } from './components/CheckSummary'
-import { ResultsTable } from './components/ResultsTable'
+import { IPMatrixTable } from './components/IPMatrixTable'
+import { exportPdf } from './utils/exportPdf'
 
 export default function App() {
   const [alignmentData, setAlignmentData] = useState<AlignmentData | null>(null)
@@ -16,8 +17,6 @@ export default function App() {
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
   const [designSpeed, setDesignSpeed] = useState<DesignSpeed>(100)
   const [standard, setStandard]       = useState<Standard>('mainroads_wa')
-  const [activeCategory, setActiveCategory] = useState<CheckCategory | 'All'>('All')
-  const [activeStatus, setActiveStatus]     = useState('All')
 
   function handleFile(content: string, name: string) {
     const data = parse12dHtml(content)
@@ -25,8 +24,6 @@ export default function App() {
     setAlignmentData(data)
     setParseWarnings(data.parseWarnings)
     if (data.designSpeed) setDesignSpeed(data.designSpeed)
-    setActiveCategory('All')
-    setActiveStatus('All')
   }
 
   function handleReset() {
@@ -45,14 +42,6 @@ export default function App() {
     ]
   }, [alignmentData, designSpeed, standard])
 
-  const filteredResults = useMemo(() => {
-    return allResults.filter(r => {
-      const catOk = activeCategory === 'All' || r.category === activeCategory
-      const stOk  = activeStatus   === 'All' || r.status   === activeStatus
-      return catOk && stOk
-    })
-  }, [allResults, activeCategory, activeStatus])
-
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Header */}
@@ -70,6 +59,12 @@ export default function App() {
                 <p className="text-sm font-semibold">{alignmentData.name}</p>
                 <p className="text-xs text-blue-300">{filename}</p>
               </div>
+              <button
+                onClick={() => exportPdf(alignmentData, allResults, designSpeed, standard)}
+                className="rounded-lg bg-white text-blue-900 px-3 py-1.5 text-xs font-semibold hover:bg-blue-50 transition-colors"
+              >
+                Export PDF
+              </button>
               <button
                 onClick={handleReset}
                 className="rounded-lg bg-blue-800 px-3 py-1.5 text-xs font-semibold hover:bg-blue-700 transition-colors"
@@ -128,17 +123,11 @@ export default function App() {
               />
             </div>
 
-            {/* Summary + filters */}
-            <CheckSummary
-              results={allResults}
-              activeCategory={activeCategory}
-              onCategoryChange={setActiveCategory}
-              activeStatus={activeStatus}
-              onStatusChange={setActiveStatus}
-            />
+            {/* Summary */}
+            <CheckSummary results={allResults} />
 
-            {/* Results table */}
-            <ResultsTable results={filteredResults} />
+            {/* IP matrix */}
+            <IPMatrixTable data={alignmentData} results={allResults} />
           </>
         )}
       </main>

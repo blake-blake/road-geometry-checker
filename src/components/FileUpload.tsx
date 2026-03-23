@@ -11,10 +11,16 @@ export function FileUpload({ onFile }: Props) {
   function readFile(file: File) {
     const reader = new FileReader()
     reader.onload = e => {
-      const text = e.target?.result as string
+      const buffer = e.target?.result as ArrayBuffer
+      const bytes = new Uint8Array(buffer)
+      // Detect UTF-16 BOM (0xFF 0xFE = LE, 0xFE 0xFF = BE); fall back to UTF-8
+      let encoding = 'utf-8'
+      if (bytes[0] === 0xFF && bytes[1] === 0xFE) encoding = 'utf-16le'
+      else if (bytes[0] === 0xFE && bytes[1] === 0xFF) encoding = 'utf-16be'
+      const text = new TextDecoder(encoding).decode(buffer)
       onFile(text, file.name)
     }
-    reader.readAsText(file)
+    reader.readAsArrayBuffer(file)
   }
 
   function handleDrop(e: React.DragEvent) {
