@@ -5,6 +5,9 @@ export type Standard = 'austroads' | 'mainroads_wa'
 /** Vehicle types for SSD and K-value computation */
 export type VehicleType = 'LME' | 'HME' | 'RAV4S' | 'Truck'
 
+/** Road surface type — determines applicable standards and vehicle types */
+export type RoadSurface = 'sealed' | 'unsealed'
+
 export type CheckStatus = 'pass' | 'fail' | 'warning' | 'info'
 
 export type CheckCategory =

@@ -1,6 +1,6 @@
 # US-012 — Road Surface Type (Sealed / Unsealed)
 
-**Status:** 🔲 Planned
+**Status:** ✅ Complete
 
 ## Story
 

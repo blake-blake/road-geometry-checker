@@ -1,5 +1,6 @@
-import type { AlignmentData, CheckResult, DesignSpeed, Standard, VehicleType } from '../types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, RoadSurface, Standard, VehicleType } from '../types/geometry'
 import { getKValue, getMaxGrade, MIN_GRADE, MIN_VCL, getMinVerticalTangent, getVehicleCrestK, VEHICLE_PARAMS } from '../standards/austroads'
+import { UNSEALED_MAX_GRADE } from '../standards/unsealed'
 
 let _id = 0
 const id = () => `v${++_id}`
@@ -10,13 +11,15 @@ export function checkVerticalAlignment(
   _standard: Standard,
   vehicleTypes: VehicleType[] = ['LME'],
   objectHeight: number = 0.2,
+  roadSurface: RoadSurface = 'sealed',
 ): CheckResult[] {
   _id = 0
   const results: CheckResult[] = []
   const { verticalIPs, gradeSections } = data
   if (verticalIPs.length === 0) return results
 
-  const maxGrade = getMaxGrade(speed)
+  const maxGrade = roadSurface === 'unsealed' ? UNSEALED_MAX_GRADE[speed] : getMaxGrade(speed)
+  const gradeClause = roadSurface === 'unsealed' ? 'ARRB Unsealed Road Guide' : 'AGRD03 Table 9.1'
 
   // ── Grade section checks ──────────────────────────────────────────────────
   for (const section of gradeSections) {
@@ -31,7 +34,7 @@ export function checkVerticalAlignment(
       value: `${absGrade.toFixed(2)}%`,
       limit: `≤ ${maxGrade}%`,
       status: absGrade <= maxGrade ? 'pass' : 'fail',
-      clause: 'AGRD03 Table 9.1',
+      clause: gradeClause,
     })
 
     results.push({
@@ -85,7 +88,7 @@ export function checkVerticalAlignment(
       // Find which vehicle type demands the highest (most conservative) K
       let worstK = { absolute: 0, desirable: 0, controlledBy: 'LME' as VehicleType }
       for (const vt of vehicleTypes) {
-        const kv = getVehicleCrestK(speed, vt, objectHeight)
+        const kv = getVehicleCrestK(speed, vt, objectHeight, roadSurface)
         if (kv.absolute > worstK.absolute) {
           worstK = { ...kv, controlledBy: vt }
         }

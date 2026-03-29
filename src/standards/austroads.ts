@@ -3,7 +3,8 @@
  * with Main Roads Western Australia Supplement values where noted.
  */
 
-import type { DesignSpeed, Standard, VehicleType } from '../types/geometry'
+import type { DesignSpeed, Standard, VehicleType, RoadSurface } from '../types/geometry'
+import { UNSEALED_FRICTION, computeUnsealedSSD } from './unsealed'
 
 // ─── Horizontal Alignment ────────────────────────────────────────────────────
 
@@ -171,21 +172,28 @@ const SEALED_FRICTION: Record<DesignSpeed, number> = {
 }
 
 /**
- * Compute SSD for a given vehicle type on a sealed road.
+ * Compute SSD for a given vehicle type and road surface.
  * Formula: SSD = V/3.6 × t + V²/(254 × f)
  * where t = reaction time (s) and f = friction coefficient × vehicle multiplier.
- * LME values are calibrated to match AGRD03 Table 4.1.
+ * LME on sealed is calibrated to match AGRD03 Table 4.1.
  */
-export function computeSSD(speed: DesignSpeed, vehicleType: VehicleType): number {
+export function computeSSD(
+  speed: DesignSpeed,
+  vehicleType: VehicleType,
+  roadSurface: RoadSurface = 'sealed',
+): number {
   const params = VEHICLE_PARAMS[vehicleType]
+  if (roadSurface === 'unsealed') {
+    return computeUnsealedSSD(speed, params.reactionTime, params.frictionMultiplier)
+  }
   const f = SEALED_FRICTION[speed] * params.frictionMultiplier
   const V = speed
   return V / 3.6 * params.reactionTime + (V * V) / (254 * f)
 }
 
 /**
- * Compute minimum crest K value for a given vehicle type and object height.
- * Scales from the AGRD03 LME baseline K table using:
+ * Compute minimum crest K value for a given vehicle type, road surface, and object height.
+ * Scales from the AGRD03 LME sealed baseline K table using:
  *   K_vehicle = K_LME × (SSD_vehicle / SSD_LME)² × (h_LME / h_vehicle)²
  * where h = √(2·h1) + √(2·h2)
  *
@@ -195,14 +203,15 @@ export function getVehicleCrestK(
   speed: DesignSpeed,
   vehicleType: VehicleType,
   objectHeight: number,
+  roadSurface: RoadSurface = 'sealed',
 ): { absolute: number; desirable: number } {
   const baseK = K_CREST[speed]
   const lmeSSD = SSD[speed]
-  const vehicleSSD = computeSSD(speed, vehicleType)
+  const vehicleSSD = computeSSD(speed, vehicleType, roadSurface)
 
   // Combined height factor for LME baseline (h1=1.15m, h2=0.2m)
   const hLME = Math.sqrt(2 * 1.15) + Math.sqrt(2 * 0.2)
-  // Combined height factor for this vehicle
+  // Combined height factor for this vehicle and object height
   const h1 = VEHICLE_PARAMS[vehicleType].eyeHeight
   const hVehicle = Math.sqrt(2 * h1) + Math.sqrt(2 * objectHeight)
 
@@ -212,6 +221,9 @@ export function getVehicleCrestK(
     desirable: Math.ceil(baseK.desirable * scale),
   }
 }
+
+/** Unsealed friction lookup re-exported for use in check files */
+export { UNSEALED_FRICTION }
 
 /**
  * Minimum tangent between consecutive vertical curves for appearance and perception.

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { AlignmentData, CheckResult, DesignSpeed, Standard, VehicleType } from './types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, RoadSurface, Standard, VehicleType } from './types/geometry'
 import { parse12dHtml } from './parsers/parse12dHtml'
 import { checkHorizontalAlignment } from './checks/horizontalAlignment'
 import { checkVerticalAlignment } from './checks/verticalAlignment'
@@ -18,6 +18,7 @@ export default function App() {
   const [designSpeed, setDesignSpeed]     = useState<DesignSpeed>(100)
   const [standard, setStandard]           = useState<Standard>('mainroads_wa')
   const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
+  const [roadSurface, setRoadSurface]     = useState<RoadSurface>('sealed')
 
   function handleFile(content: string, name: string) {
     const data = parse12dHtml(content)
@@ -37,11 +38,11 @@ export default function App() {
     if (!alignmentData) return []
     return [
       ...checkHorizontalAlignment(alignmentData, designSpeed, standard),
-      ...checkVerticalAlignment(alignmentData, designSpeed, standard, vehicleTypes),
+      ...checkVerticalAlignment(alignmentData, designSpeed, standard, vehicleTypes, 0.2, roadSurface),
       ...checkSuperelevation(alignmentData, designSpeed, standard),
       ...checkChainages(alignmentData),
     ]
-  }, [alignmentData, designSpeed, standard, vehicleTypes])
+  }, [alignmentData, designSpeed, standard, vehicleTypes, roadSurface])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -110,9 +111,11 @@ export default function App() {
               speed={designSpeed}
               standard={standard}
               vehicleTypes={vehicleTypes}
+              roadSurface={roadSurface}
               onSpeedChange={setDesignSpeed}
               onStandardChange={setStandard}
               onVehicleTypesChange={setVehicleTypes}
+              onRoadSurfaceChange={setRoadSurface}
             />
 
             {/* Alignment info */}

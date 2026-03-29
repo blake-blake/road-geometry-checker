@@ -1,31 +1,48 @@
-import type { DesignSpeed, Standard, VehicleType } from '../types/geometry'
+import type { DesignSpeed, RoadSurface, Standard, VehicleType } from '../types/geometry'
 import { VEHICLE_PARAMS } from '../standards/austroads'
+import { UNSEALED_EXCLUDED_VEHICLES, SEALED_EXCLUDED_VEHICLES } from '../standards/unsealed'
 
 interface Props {
   speed: DesignSpeed
   standard: Standard
   vehicleTypes: VehicleType[]
+  roadSurface: RoadSurface
   onSpeedChange: (s: DesignSpeed) => void
   onStandardChange: (s: Standard) => void
   onVehicleTypesChange: (vt: VehicleType[]) => void
+  onRoadSurfaceChange: (s: RoadSurface) => void
 }
 
 const SPEEDS: DesignSpeed[] = [40, 50, 60, 70, 80, 90, 100, 110, 120, 130]
 const ALL_VEHICLE_TYPES: VehicleType[] = ['LME', 'Truck', 'RAV4S', 'HME']
 
 export function DesignSpeedSelector({
-  speed, standard, vehicleTypes,
-  onSpeedChange, onStandardChange, onVehicleTypesChange,
+  speed, standard, vehicleTypes, roadSurface,
+  onSpeedChange, onStandardChange, onVehicleTypesChange, onRoadSurfaceChange,
 }: Props) {
 
   function toggleVehicleType(vt: VehicleType) {
     if (vehicleTypes.includes(vt)) {
-      // Don't allow deselecting the last type
       if (vehicleTypes.length === 1) return
       onVehicleTypesChange(vehicleTypes.filter(v => v !== vt))
     } else {
       onVehicleTypesChange([...vehicleTypes, vt])
     }
+  }
+
+  function handleRoadSurfaceChange(surface: RoadSurface) {
+    onRoadSurfaceChange(surface)
+    // Remove vehicle types that don't apply to the new surface
+    const excluded = surface === 'unsealed'
+      ? (UNSEALED_EXCLUDED_VEHICLES as readonly string[])
+      : (SEALED_EXCLUDED_VEHICLES as readonly string[])
+    const filtered = vehicleTypes.filter(vt => !excluded.includes(vt))
+    onVehicleTypesChange(filtered.length > 0 ? filtered : ['LME'])
+  }
+
+  const disabledForSurface = (vt: VehicleType): boolean => {
+    if (roadSurface === 'unsealed') return (UNSEALED_EXCLUDED_VEHICLES as readonly string[]).includes(vt)
+    return (SEALED_EXCLUDED_VEHICLES as readonly string[]).includes(vt)
   }
 
   return (
@@ -74,6 +91,28 @@ export function DesignSpeedSelector({
         </div>
       </div>
 
+      {/* Road surface */}
+      <div className="border-l border-slate-200 pl-6">
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Road Surface
+        </label>
+        <div className="flex gap-2">
+          {(['sealed', 'unsealed'] as RoadSurface[]).map(surface => (
+            <button
+              key={surface}
+              onClick={() => handleRoadSurfaceChange(surface)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                roadSurface === surface
+                  ? 'bg-green-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {surface === 'sealed' ? 'Sealed' : 'Unsealed'}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Vehicle types */}
       <div className="border-l border-slate-200 pl-6">
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -82,18 +121,21 @@ export function DesignSpeedSelector({
         <div className="flex gap-3 flex-wrap">
           {ALL_VEHICLE_TYPES.map(vt => {
             const selected = vehicleTypes.includes(vt)
+            const disabled = disabledForSurface(vt)
             return (
               <label
                 key={vt}
-                className="flex items-center gap-1.5 cursor-pointer select-none"
+                className={`flex items-center gap-1.5 select-none ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                title={disabled ? `${VEHICLE_PARAMS[vt].label} is not applicable to ${roadSurface} roads` : undefined}
               >
                 <input
                   type="checkbox"
-                  checked={selected}
-                  onChange={() => toggleVehicleType(vt)}
+                  checked={selected && !disabled}
+                  disabled={disabled}
+                  onChange={() => !disabled && toggleVehicleType(vt)}
                   className="accent-blue-600"
                 />
-                <span className={`text-sm font-semibold ${selected ? 'text-slate-800' : 'text-slate-400'}`}>
+                <span className={`text-sm font-semibold ${selected && !disabled ? 'text-slate-800' : 'text-slate-400'}`}>
                   {VEHICLE_PARAMS[vt].label}
                 </span>
               </label>
