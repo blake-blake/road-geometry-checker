@@ -18,4 +18,4 @@ All implemented features for the Road Geometry Checker.
 | [US-012](US-012-road-surface.md) | Road Surface Type (Sealed / Unsealed) | ✅ Complete |
 | [US-013](US-013-object-height.md) | Object Height Toggle for Crest Sight Distance | ✅ Complete |
 | [US-014](US-014-smart-defaults.md) | Smart Defaults: emax and Object Height | ✅ Complete |
-| [US-015](US-015-per-ip-speed-override.md) | Per-IP Design Speed Override | 🔲 Planned |
+| [US-015](US-015-per-ip-speed-override.md) | Per-IP Design Speed Override | ✅ Complete |

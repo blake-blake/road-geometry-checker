@@ -12,6 +12,7 @@ export function checkVerticalAlignment(
   vehicleTypes: VehicleType[] = ['LME'],
   objectHeight: number = 0.2,
   roadSurface: RoadSurface = 'sealed',
+  ipSpeedOverrides: Record<string, DesignSpeed> = {},
 ): CheckResult[] {
   _id = 0
   const results: CheckResult[] = []
@@ -57,7 +58,8 @@ export function checkVerticalAlignment(
     if (prev.vcLength === 0 && curr.vcLength === 0) continue
 
     const tangentBetween = curr.chainage - curr.vcLength / 2 - (prev.chainage + prev.vcLength / 2)
-    const minT = getMinVerticalTangent(speed)
+    const currSpeed = ipSpeedOverrides[curr.id] ?? speed
+    const minT = getMinVerticalTangent(currSpeed)
 
     if (tangentBetween < minT.desirable) {
       results.push({
@@ -80,6 +82,7 @@ export function checkVerticalAlignment(
   for (const vip of verticalIPs) {
     if (vip.vcType === 'none' || vip.vcLength === 0) continue
 
+    const vipSpeed = ipSpeedOverrides[vip.id] ?? speed
     const label = `VIP ${vip.id}`
     const clause = 'AGRD03 Table 9.1 & 9.2'
 
@@ -88,7 +91,7 @@ export function checkVerticalAlignment(
       // Find which vehicle type demands the highest (most conservative) K
       let worstK = { absolute: 0, desirable: 0, controlledBy: 'LME' as VehicleType }
       for (const vt of vehicleTypes) {
-        const kv = getVehicleCrestK(speed, vt, objectHeight, roadSurface)
+        const kv = getVehicleCrestK(vipSpeed, vt, objectHeight, roadSurface)
         if (kv.absolute > worstK.absolute) {
           worstK = { ...kv, controlledBy: vt }
         }
@@ -139,7 +142,7 @@ export function checkVerticalAlignment(
 
     // ── Sag K — comfort criterion, same for all vehicle types ─────────────────
     if (vip.vcType === 'sag') {
-      const kReq = getKValue(speed, 'sag')
+      const kReq = getKValue(vipSpeed, 'sag')
       results.push({
         id: id(),
         category: 'Vertical Alignment',

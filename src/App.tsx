@@ -20,12 +20,14 @@ export default function App() {
   const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
   const [roadSurface, setRoadSurface]     = useState<RoadSurface>('sealed')
   const [objectHeight, setObjectHeight]   = useState<number>(0.2)
+  const [ipSpeedOverrides, setIpSpeedOverrides] = useState<Record<string, DesignSpeed>>({})
 
   function handleFile(content: string, name: string) {
     const data = parse12dHtml(content)
     setFilename(name)
     setAlignmentData(data)
     setParseWarnings(data.parseWarnings)
+    setIpSpeedOverrides({})
     if (data.designSpeed) setDesignSpeed(data.designSpeed)
   }
 
@@ -33,17 +35,27 @@ export default function App() {
     setAlignmentData(null)
     setFilename('')
     setParseWarnings([])
+    setIpSpeedOverrides({})
+  }
+
+  function handleSpeedOverride(ipId: string, overrideSpeed: DesignSpeed | null) {
+    setIpSpeedOverrides(prev => {
+      const next = { ...prev }
+      if (overrideSpeed === null) delete next[ipId]
+      else next[ipId] = overrideSpeed
+      return next
+    })
   }
 
   const allResults: CheckResult[] = useMemo(() => {
     if (!alignmentData) return []
     return [
-      ...checkHorizontalAlignment(alignmentData, designSpeed, emax),
-      ...checkVerticalAlignment(alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface),
+      ...checkHorizontalAlignment(alignmentData, designSpeed, emax, ipSpeedOverrides),
+      ...checkVerticalAlignment(alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface, ipSpeedOverrides),
       ...checkSuperelevation(alignmentData, designSpeed, emax),
       ...checkChainages(alignmentData),
     ]
-  }, [alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface])
+  }, [alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface, ipSpeedOverrides])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -136,7 +148,13 @@ export default function App() {
             <CheckSummary results={allResults} />
 
             {/* IP matrix */}
-            <IPMatrixTable data={alignmentData} results={allResults} />
+            <IPMatrixTable
+              data={alignmentData}
+              results={allResults}
+              speed={designSpeed}
+              ipSpeedOverrides={ipSpeedOverrides}
+              onSpeedOverride={handleSpeedOverride}
+            />
           </>
         )}
       </main>

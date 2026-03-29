@@ -1,4 +1,6 @@
-import type { AlignmentData, CheckResult, CheckStatus } from '../types/geometry'
+import type { AlignmentData, CheckResult, CheckStatus, DesignSpeed } from '../types/geometry'
+
+const SPEEDS: DesignSpeed[] = [40, 50, 60, 70, 80, 90, 100, 110, 120, 130]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,9 +76,49 @@ const TH = ({ children, className = '' }: { children: React.ReactNode; className
   </th>
 )
 
+// ─── Speed override cell ──────────────────────────────────────────────────────
+
+interface OverrideProps {
+  ipId: string
+  globalSpeed: DesignSpeed
+  overrideSpeed?: DesignSpeed
+  onChange: (ipId: string, speed: DesignSpeed | null) => void
+}
+
+function SpeedOverrideSelect({ ipId, globalSpeed, overrideSpeed, onChange }: OverrideProps) {
+  const hasOverride = overrideSpeed !== undefined
+  return (
+    <select
+      value={overrideSpeed ?? globalSpeed}
+      onChange={e => {
+        const val = Number(e.target.value) as DesignSpeed
+        onChange(ipId, val === globalSpeed ? null : val)
+      }}
+      className={`mt-0.5 w-full rounded border px-1 py-0.5 text-[10px] font-mono leading-tight ${
+        hasOverride
+          ? 'border-orange-400 bg-orange-50 text-orange-800 font-bold'
+          : 'border-slate-200 bg-transparent text-slate-500'
+      }`}
+      title={hasOverride ? `Speed override: ${overrideSpeed} km/h (global: ${globalSpeed} km/h)` : 'Click to override speed for this IP'}
+    >
+      {SPEEDS.map(s => (
+        <option key={s} value={s}>{s}{s === globalSpeed ? ' ✓' : ''}</option>
+      ))}
+    </select>
+  )
+}
+
 // ─── Horizontal IPs matrix ────────────────────────────────────────────────────
 
-function HorizontalMatrix({ data, results }: { data: AlignmentData; results: CheckResult[] }) {
+interface HMatrixProps {
+  data: AlignmentData
+  results: CheckResult[]
+  speed: DesignSpeed
+  ipSpeedOverrides: Record<string, DesignSpeed>
+  onSpeedOverride: (ipId: string, speed: DesignSpeed | null) => void
+}
+
+function HorizontalMatrix({ data, results, speed, ipSpeedOverrides, onSpeedOverride }: HMatrixProps) {
   const { horizontalIPs } = data
   if (horizontalIPs.length === 0) return null
 
@@ -137,7 +179,10 @@ function HorizontalMatrix({ data, results }: { data: AlignmentData; results: Che
           <tbody>
             {horizontalIPs.map((ip, i) => (
               <tr key={ip.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                <td className="border border-slate-200 px-3 py-2 font-semibold text-slate-700 sticky left-0 bg-inherit">{ip.id}</td>
+                <td className="border border-slate-200 px-2 py-1 sticky left-0 bg-inherit min-w-[70px]">
+                  <div className={`font-semibold text-xs ${ipSpeedOverrides[ip.id] ? 'text-orange-700 italic' : 'text-slate-700'}`}>{ip.id}</div>
+                  <SpeedOverrideSelect ipId={ip.id} globalSpeed={speed} overrideSpeed={ipSpeedOverrides[ip.id]} onChange={onSpeedOverride} />
+                </td>
                 <td className="border border-slate-200 px-3 py-2 font-mono text-slate-600 text-right">{ip.chainage.toFixed(3)}</td>
                 <td className="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">{ip.deflectionDirection}</td>
                 <td className="border border-slate-200 px-3 py-2 font-mono text-slate-600 text-right">{ip.radius.toFixed(1)}</td>
@@ -168,7 +213,15 @@ function HorizontalMatrix({ data, results }: { data: AlignmentData; results: Che
 
 // ─── Vertical IPs matrix ─────────────────────────────────────────────────────
 
-function VerticalMatrix({ data, results }: { data: AlignmentData; results: CheckResult[] }) {
+interface VMatrixProps {
+  data: AlignmentData
+  results: CheckResult[]
+  speed: DesignSpeed
+  ipSpeedOverrides: Record<string, DesignSpeed>
+  onSpeedOverride: (ipId: string, speed: DesignSpeed | null) => void
+}
+
+function VerticalMatrix({ data, results, speed, ipSpeedOverrides, onSpeedOverride }: VMatrixProps) {
   const { verticalIPs, gradeSections } = data
   if (verticalIPs.length === 0) return null
 
@@ -230,7 +283,10 @@ function VerticalMatrix({ data, results }: { data: AlignmentData; results: Check
               const secOut = gradeSections.find(s => Math.abs(s.fromChainage - vip.chainage) < 0.5)
               return (
                 <tr key={vip.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                  <td className="border border-slate-200 px-3 py-2 font-semibold text-slate-700 sticky left-0 bg-inherit">{vip.id}</td>
+                  <td className="border border-slate-200 px-2 py-1 sticky left-0 bg-inherit min-w-[70px]">
+                    <div className={`font-semibold text-xs ${ipSpeedOverrides[vip.id] ? 'text-orange-700 italic' : 'text-slate-700'}`}>{vip.id}</div>
+                    <SpeedOverrideSelect ipId={vip.id} globalSpeed={speed} overrideSpeed={ipSpeedOverrides[vip.id]} onChange={onSpeedOverride} />
+                  </td>
                   <td className="border border-slate-200 px-3 py-2 font-mono text-slate-600 text-right">{vip.chainage.toFixed(3)}</td>
                   <td className="border border-slate-200 px-3 py-2 text-slate-600 capitalize">{vip.vcType === 'none' ? 'Line' : vip.vcType}</td>
                   <td className="border border-slate-200 px-3 py-2 font-mono text-slate-600 text-right">{vip.gradeIn.toFixed(2)}</td>
@@ -277,15 +333,18 @@ function ChainageIssues({ results }: { results: CheckResult[] }) {
 interface Props {
   data: AlignmentData
   results: CheckResult[]
+  speed: DesignSpeed
+  ipSpeedOverrides: Record<string, DesignSpeed>
+  onSpeedOverride: (ipId: string, speed: DesignSpeed | null) => void
 }
 
-export function IPMatrixTable({ data, results }: Props) {
+export function IPMatrixTable({ data, results, speed, ipSpeedOverrides, onSpeedOverride }: Props) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="divide-y divide-slate-100">
         <div className="p-6 space-y-8">
-          <HorizontalMatrix data={data} results={results} />
-          <VerticalMatrix   data={data} results={results} />
+          <HorizontalMatrix data={data} results={results} speed={speed} ipSpeedOverrides={ipSpeedOverrides} onSpeedOverride={onSpeedOverride} />
+          <VerticalMatrix   data={data} results={results} speed={speed} ipSpeedOverrides={ipSpeedOverrides} onSpeedOverride={onSpeedOverride} />
           <ChainageIssues   results={results} />
         </div>
       </div>

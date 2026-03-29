@@ -1,6 +1,6 @@
 # US-015 — Per-IP Design Speed Override
 
-**Status:** 🔲 Planned
+**Status:** ✅ Complete
 
 ## Story
 

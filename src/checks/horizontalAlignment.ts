@@ -10,14 +10,13 @@ export function checkHorizontalAlignment(
   data: AlignmentData,
   speed: DesignSpeed,
   emax: EmaxValue,
+  ipSpeedOverrides: Record<string, DesignSpeed> = {},
 ): CheckResult[] {
   _id = 0
   const results: CheckResult[] = []
   const { horizontalIPs } = data
   if (horizontalIPs.length === 0) return results
 
-  const minR = getMinRadius(speed, emax)
-  const minCurveLen = getMinCurveLength(speed)
   const emaxLabel = `emax=${emax}%`
   const clause = emax === 10
     ? 'AGRD03 Table 3.1 / MRWA Supplement'
@@ -27,6 +26,9 @@ export function checkHorizontalAlignment(
     const ip = horizontalIPs[i]
     if (ip.radius === 0) continue  // tangent — no curve checks
 
+    const ipSpeed = ipSpeedOverrides[ip.id] ?? speed
+    const minR = getMinRadius(ipSpeed, emax)
+    const minCurveLen = getMinCurveLength(ipSpeed)
     const label = `IP ${ip.id}`
 
     // ── 1. Minimum radius (absolute) ─────────────────────────────────────────
@@ -72,7 +74,7 @@ export function checkHorizontalAlignment(
 
     // ── 4. Transition curve lengths ───────────────────────────────────────────
     if (ip.transitionLengthIn > 0 || ip.transitionLengthOut > 0) {
-      const minTrans = getMinTransitionLength(speed, ip.radius)
+      const minTrans = getMinTransitionLength(ipSpeed, ip.radius)
 
       if (ip.transitionLengthIn > 0) {
         results.push({
@@ -144,7 +146,7 @@ export function checkHorizontalAlignment(
           ? ip.tangentLength
           : ip.radius * Math.tan((ip.deflectionAngle / 2) * (Math.PI / 180))
         const tangentBetween = ip.chainage - tCurr - (prev.chainage + tPrev)
-        const minT = getMinTangentBetweenCurves(speed)
+        const minT = getMinTangentBetweenCurves(ipSpeed)
 
         if (prev.deflectionDirection === ip.deflectionDirection) {
           // ── Broken back: same direction, tangent between them
