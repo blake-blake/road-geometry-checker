@@ -19,6 +19,7 @@ export default function App() {
   const [standard, setStandard]           = useState<Standard>('mainroads_wa')
   const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
   const [roadSurface, setRoadSurface]     = useState<RoadSurface>('sealed')
+  const [objectHeight, setObjectHeight]   = useState<number>(0.2)
 
   function handleFile(content: string, name: string) {
     const data = parse12dHtml(content)
@@ -38,11 +39,11 @@ export default function App() {
     if (!alignmentData) return []
     return [
       ...checkHorizontalAlignment(alignmentData, designSpeed, standard),
-      ...checkVerticalAlignment(alignmentData, designSpeed, standard, vehicleTypes, 0.2, roadSurface),
+      ...checkVerticalAlignment(alignmentData, designSpeed, standard, vehicleTypes, objectHeight, roadSurface),
       ...checkSuperelevation(alignmentData, designSpeed, standard),
       ...checkChainages(alignmentData),
     ]
-  }, [alignmentData, designSpeed, standard, vehicleTypes, roadSurface])
+  }, [alignmentData, designSpeed, standard, vehicleTypes, objectHeight, roadSurface])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -112,10 +113,12 @@ export default function App() {
               standard={standard}
               vehicleTypes={vehicleTypes}
               roadSurface={roadSurface}
+              objectHeight={objectHeight}
               onSpeedChange={setDesignSpeed}
               onStandardChange={setStandard}
               onVehicleTypesChange={setVehicleTypes}
               onRoadSurfaceChange={setRoadSurface}
+              onObjectHeightChange={setObjectHeight}
             />
 
             {/* Alignment info */}

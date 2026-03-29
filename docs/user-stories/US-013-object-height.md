@@ -1,6 +1,6 @@
 # US-013 — Object Height Toggle for Crest Sight Distance
 
-**Status:** 🔲 Planned
+**Status:** ✅ Complete
 
 ## Story
 

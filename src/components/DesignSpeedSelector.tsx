@@ -7,18 +7,20 @@ interface Props {
   standard: Standard
   vehicleTypes: VehicleType[]
   roadSurface: RoadSurface
+  objectHeight: number
   onSpeedChange: (s: DesignSpeed) => void
   onStandardChange: (s: Standard) => void
   onVehicleTypesChange: (vt: VehicleType[]) => void
   onRoadSurfaceChange: (s: RoadSurface) => void
+  onObjectHeightChange: (h: number) => void
 }
 
 const SPEEDS: DesignSpeed[] = [40, 50, 60, 70, 80, 90, 100, 110, 120, 130]
 const ALL_VEHICLE_TYPES: VehicleType[] = ['LME', 'Truck', 'RAV4S', 'HME']
 
 export function DesignSpeedSelector({
-  speed, standard, vehicleTypes, roadSurface,
-  onSpeedChange, onStandardChange, onVehicleTypesChange, onRoadSurfaceChange,
+  speed, standard, vehicleTypes, roadSurface, objectHeight,
+  onSpeedChange, onStandardChange, onVehicleTypesChange, onRoadSurfaceChange, onObjectHeightChange,
 }: Props) {
 
   function toggleVehicleType(vt: VehicleType) {
@@ -111,6 +113,31 @@ export function DesignSpeedSelector({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Object height */}
+      <div className="border-l border-slate-200 pl-6">
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Object Height (h₂)
+        </label>
+        <div className="flex gap-2">
+          {([0.2, 0.0] as number[]).map(h => (
+            <button
+              key={h}
+              onClick={() => onObjectHeightChange(h)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                objectHeight === h
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {h === 0.2 ? 'h₂ = 0.2 m' : 'h₂ = 0 m'}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-[10px] text-slate-400">
+          Affects crest K values only.
+        </p>
       </div>
 
       {/* Vehicle types */}
