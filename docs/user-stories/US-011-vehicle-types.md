@@ -1,6 +1,6 @@
 # US-011 — Vehicle Type Selection
 
-**Status:** 🔲 Planned
+**Status:** ✅ Complete
 
 ## Story
 

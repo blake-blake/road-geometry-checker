@@ -2,6 +2,9 @@ export type DesignSpeed = 40 | 50 | 60 | 70 | 80 | 90 | 100 | 110 | 120 | 130
 
 export type Standard = 'austroads' | 'mainroads_wa'
 
+/** Vehicle types for SSD and K-value computation */
+export type VehicleType = 'LME' | 'HME' | 'RAV4S' | 'Truck'
+
 export type CheckStatus = 'pass' | 'fail' | 'warning' | 'info'
 
 export type CheckCategory =

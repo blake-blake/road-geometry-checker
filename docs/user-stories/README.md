@@ -14,7 +14,7 @@ All implemented features for the Road Geometry Checker.
 | [US-008](US-008-results-display.md) | Results Display (IP Matrix Table) | ✅ Complete |
 | [US-009](US-009-pdf-export.md) | PDF Export | ✅ Complete |
 | [US-010](US-010-deployment.md) | GitHub Pages Deployment | ✅ Complete |
-| [US-011](US-011-vehicle-types.md) | Vehicle Type Selection | 🔲 Planned |
+| [US-011](US-011-vehicle-types.md) | Vehicle Type Selection | ✅ Complete |
 | [US-012](US-012-road-surface.md) | Road Surface Type (Sealed / Unsealed) | 🔲 Planned |
 | [US-013](US-013-object-height.md) | Object Height Toggle for Crest Sight Distance | 🔲 Planned |
 | [US-014](US-014-smart-defaults.md) | Smart Defaults: emax and Object Height | 🔲 Planned |

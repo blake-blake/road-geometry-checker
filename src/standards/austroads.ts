@@ -3,7 +3,7 @@
  * with Main Roads Western Australia Supplement values where noted.
  */
 
-import type { DesignSpeed, Standard } from '../types/geometry'
+import type { DesignSpeed, Standard, VehicleType } from '../types/geometry'
 
 // ─── Horizontal Alignment ────────────────────────────────────────────────────
 
@@ -140,6 +140,78 @@ export function getSSD(speed: DesignSpeed): number {
 
 /** Minimum vertical curve length (general, not SSD-derived). 50 m practical minimum. */
 export const MIN_VCL = 50
+
+// ─── Vehicle type parameters ─────────────────────────────────────────────────
+
+/**
+ * Parameters per vehicle type used for SSD and crest K computation.
+ * reactionTime: PIEV / perception-reaction time in seconds
+ * frictionMultiplier: applied to base road friction (accounts for vehicle braking capability)
+ * eyeHeight: driver/operator eye height h1 (metres)
+ * maxSpeed: practical maximum design speed for this vehicle type (km/h)
+ */
+export const VEHICLE_PARAMS: Record<VehicleType, {
+  label: string
+  reactionTime: number
+  frictionMultiplier: number
+  eyeHeight: number
+  maxSpeed: number
+}> = {
+  LME:   { label: 'LME',    reactionTime: 2.5, frictionMultiplier: 1.0,  eyeHeight: 1.15, maxSpeed: 130 },
+  Truck: { label: 'Truck',  reactionTime: 2.5, frictionMultiplier: 0.85, eyeHeight: 2.4,  maxSpeed: 130 },
+  RAV4S: { label: 'RAV-4S', reactionTime: 4.0, frictionMultiplier: 0.85, eyeHeight: 2.4,  maxSpeed: 130 },
+  HME:   { label: 'HME',   reactionTime: 4.0, frictionMultiplier: 0.50, eyeHeight: 6.5,  maxSpeed: 55  },
+}
+
+/** Sealed road friction coefficients (Austroads AGRD03 Table 4.1, calibrated to reproduce SSD table) */
+const SEALED_FRICTION: Record<DesignSpeed, number> = {
+  40: 0.36, 50: 0.35, 60: 0.33, 70: 0.31,
+  80: 0.30, 90: 0.30, 100: 0.28, 110: 0.25,
+  120: 0.24, 130: 0.23,
+}
+
+/**
+ * Compute SSD for a given vehicle type on a sealed road.
+ * Formula: SSD = V/3.6 × t + V²/(254 × f)
+ * where t = reaction time (s) and f = friction coefficient × vehicle multiplier.
+ * LME values are calibrated to match AGRD03 Table 4.1.
+ */
+export function computeSSD(speed: DesignSpeed, vehicleType: VehicleType): number {
+  const params = VEHICLE_PARAMS[vehicleType]
+  const f = SEALED_FRICTION[speed] * params.frictionMultiplier
+  const V = speed
+  return V / 3.6 * params.reactionTime + (V * V) / (254 * f)
+}
+
+/**
+ * Compute minimum crest K value for a given vehicle type and object height.
+ * Scales from the AGRD03 LME baseline K table using:
+ *   K_vehicle = K_LME × (SSD_vehicle / SSD_LME)² × (h_LME / h_vehicle)²
+ * where h = √(2·h1) + √(2·h2)
+ *
+ * objectHeight h2: 0.2 m (AGRD03 standard) or 0.0 m (object on road surface)
+ */
+export function getVehicleCrestK(
+  speed: DesignSpeed,
+  vehicleType: VehicleType,
+  objectHeight: number,
+): { absolute: number; desirable: number } {
+  const baseK = K_CREST[speed]
+  const lmeSSD = SSD[speed]
+  const vehicleSSD = computeSSD(speed, vehicleType)
+
+  // Combined height factor for LME baseline (h1=1.15m, h2=0.2m)
+  const hLME = Math.sqrt(2 * 1.15) + Math.sqrt(2 * 0.2)
+  // Combined height factor for this vehicle
+  const h1 = VEHICLE_PARAMS[vehicleType].eyeHeight
+  const hVehicle = Math.sqrt(2 * h1) + Math.sqrt(2 * objectHeight)
+
+  const scale = Math.pow(vehicleSSD / lmeSSD, 2) * Math.pow(hLME / hVehicle, 2)
+  return {
+    absolute:  Math.ceil(baseK.absolute  * scale),
+    desirable: Math.ceil(baseK.desirable * scale),
+  }
+}
 
 /**
  * Minimum tangent between consecutive vertical curves for appearance and perception.

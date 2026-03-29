@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { AlignmentData, CheckResult, DesignSpeed, Standard } from './types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, Standard, VehicleType } from './types/geometry'
 import { parse12dHtml } from './parsers/parse12dHtml'
 import { checkHorizontalAlignment } from './checks/horizontalAlignment'
 import { checkVerticalAlignment } from './checks/verticalAlignment'
@@ -15,8 +15,9 @@ export default function App() {
   const [alignmentData, setAlignmentData] = useState<AlignmentData | null>(null)
   const [filename, setFilename] = useState('')
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
-  const [designSpeed, setDesignSpeed] = useState<DesignSpeed>(100)
-  const [standard, setStandard]       = useState<Standard>('mainroads_wa')
+  const [designSpeed, setDesignSpeed]     = useState<DesignSpeed>(100)
+  const [standard, setStandard]           = useState<Standard>('mainroads_wa')
+  const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
 
   function handleFile(content: string, name: string) {
     const data = parse12dHtml(content)
@@ -36,11 +37,11 @@ export default function App() {
     if (!alignmentData) return []
     return [
       ...checkHorizontalAlignment(alignmentData, designSpeed, standard),
-      ...checkVerticalAlignment(alignmentData, designSpeed, standard),
+      ...checkVerticalAlignment(alignmentData, designSpeed, standard, vehicleTypes),
       ...checkSuperelevation(alignmentData, designSpeed, standard),
       ...checkChainages(alignmentData),
     ]
-  }, [alignmentData, designSpeed, standard])
+  }, [alignmentData, designSpeed, standard, vehicleTypes])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -108,8 +109,10 @@ export default function App() {
             <DesignSpeedSelector
               speed={designSpeed}
               standard={standard}
+              vehicleTypes={vehicleTypes}
               onSpeedChange={setDesignSpeed}
               onStandardChange={setStandard}
+              onVehicleTypesChange={setVehicleTypes}
             />
 
             {/* Alignment info */}
