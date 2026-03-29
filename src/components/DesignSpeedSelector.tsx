@@ -1,15 +1,15 @@
-import type { DesignSpeed, RoadSurface, Standard, VehicleType } from '../types/geometry'
+import type { DesignSpeed, EmaxValue, RoadSurface, VehicleType } from '../types/geometry'
 import { VEHICLE_PARAMS } from '../standards/austroads'
 import { UNSEALED_EXCLUDED_VEHICLES, SEALED_EXCLUDED_VEHICLES } from '../standards/unsealed'
 
 interface Props {
   speed: DesignSpeed
-  standard: Standard
+  emax: EmaxValue
   vehicleTypes: VehicleType[]
   roadSurface: RoadSurface
   objectHeight: number
   onSpeedChange: (s: DesignSpeed) => void
-  onStandardChange: (s: Standard) => void
+  onEmaxChange: (e: EmaxValue) => void
   onVehicleTypesChange: (vt: VehicleType[]) => void
   onRoadSurfaceChange: (s: RoadSurface) => void
   onObjectHeightChange: (h: number) => void
@@ -17,10 +17,11 @@ interface Props {
 
 const SPEEDS: DesignSpeed[] = [40, 50, 60, 70, 80, 90, 100, 110, 120, 130]
 const ALL_VEHICLE_TYPES: VehicleType[] = ['LME', 'Truck', 'RAV4S', 'HME']
+const EMAX_OPTIONS: EmaxValue[] = [6, 7, 10]
 
 export function DesignSpeedSelector({
-  speed, standard, vehicleTypes, roadSurface, objectHeight,
-  onSpeedChange, onStandardChange, onVehicleTypesChange, onRoadSurfaceChange, onObjectHeightChange,
+  speed, emax, vehicleTypes, roadSurface, objectHeight,
+  onSpeedChange, onEmaxChange, onVehicleTypesChange, onRoadSurfaceChange, onObjectHeightChange,
 }: Props) {
 
   function toggleVehicleType(vt: VehicleType) {
@@ -71,23 +72,23 @@ export function DesignSpeedSelector({
         </div>
       </div>
 
-      {/* Standard */}
+      {/* emax */}
       <div className="border-l border-slate-200 pl-6">
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Design Standard
+          emax
         </label>
         <div className="flex gap-2">
-          {(['austroads', 'mainroads_wa'] as Standard[]).map(std => (
+          {EMAX_OPTIONS.map(e => (
             <button
-              key={std}
-              onClick={() => onStandardChange(std)}
+              key={e}
+              onClick={() => onEmaxChange(e)}
               className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
-                standard === std
+                emax === e
                   ? 'bg-amber-500 text-white'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              {std === 'austroads' ? 'Austroads (emax=7%)' : 'MRWA (emax=10%)'}
+              {e}%{e === 10 ? ' (MRWA)' : e === 7 ? ' (Austroads)' : ' (Mine)'}
             </button>
           ))}
         </div>

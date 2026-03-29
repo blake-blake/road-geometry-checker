@@ -3,7 +3,7 @@
  * with Main Roads Western Australia Supplement values where noted.
  */
 
-import type { DesignSpeed, Standard, VehicleType, RoadSurface } from '../types/geometry'
+import type { DesignSpeed, EmaxValue, VehicleType, RoadSurface } from '../types/geometry'
 import { UNSEALED_FRICTION, computeUnsealedSSD } from './unsealed'
 
 // ─── Horizontal Alignment ────────────────────────────────────────────────────
@@ -22,6 +22,23 @@ const MIN_RADIUS_EMAX10: Record<DesignSpeed, { absolute: number; desirable: numb
   130: { absolute: 800,  desirable: 1300 },
 }
 
+/**
+ * emax = 6% (conservative mine road default). Values extrapolated from AGRD03 Table 3.1
+ * using linear step from the emax=7% → emax=10% ratio per 1% emax change.
+ */
+const MIN_RADIUS_EMAX6: Record<DesignSpeed, { absolute: number; desirable: number }> = {
+  40:  { absolute: 45,   desirable: 60 },
+  50:  { absolute: 90,   desirable: 120 },
+  60:  { absolute: 145,  desirable: 210 },
+  70:  { absolute: 220,  desirable: 320 },
+  80:  { absolute: 350,  desirable: 485 },
+  90:  { absolute: 495,  desirable: 680 },
+  100: { absolute: 680,  desirable: 920 },
+  110: { absolute: 890,  desirable: 1205 },
+  120: { absolute: 1125, desirable: 1510 },
+  130: { absolute: 1470, desirable: 1970 },
+}
+
 /** emax = 7% (Austroads default, non-MRWA). Austroads AGRD03 Table 3.1 */
 const MIN_RADIUS_EMAX7: Record<DesignSpeed, { absolute: number; desirable: number }> = {
   40:  { absolute: 40,   desirable: 55 },
@@ -38,9 +55,11 @@ const MIN_RADIUS_EMAX7: Record<DesignSpeed, { absolute: number; desirable: numbe
 
 export function getMinRadius(
   speed: DesignSpeed,
-  standard: Standard,
+  emax: EmaxValue,
 ): { absolute: number; desirable: number } {
-  return standard === 'mainroads_wa' ? MIN_RADIUS_EMAX10[speed] : MIN_RADIUS_EMAX7[speed]
+  if (emax === 10) return MIN_RADIUS_EMAX10[speed]
+  if (emax === 6)  return MIN_RADIUS_EMAX6[speed]
+  return MIN_RADIUS_EMAX7[speed]
 }
 
 /**
@@ -235,9 +254,9 @@ export function getMinVerticalTangent(speed: DesignSpeed): { absolute: number; d
 
 // ─── Superelevation ──────────────────────────────────────────────────────────
 
-/** Maximum superelevation rate (%). Main Roads WA = 10%, Austroads = 7% */
-export function getMaxSuperelevation(standard: Standard): number {
-  return standard === 'mainroads_wa' ? 10 : 7
+/** Maximum superelevation rate (%) — equals the selected emax value. */
+export function getMaxSuperelevation(emax: EmaxValue): number {
+  return emax
 }
 
 /** Normal crossfall (tangent) rate — both carriageways. Typically 3% max. */

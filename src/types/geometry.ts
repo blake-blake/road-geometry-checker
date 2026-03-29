@@ -2,6 +2,9 @@ export type DesignSpeed = 40 | 50 | 60 | 70 | 80 | 90 | 100 | 110 | 120 | 130
 
 export type Standard = 'austroads' | 'mainroads_wa'
 
+/** Maximum superelevation rate (%) — drives min radius and super checks */
+export type EmaxValue = 6 | 7 | 10
+
 /** Vehicle types for SSD and K-value computation */
 export type VehicleType = 'LME' | 'HME' | 'RAV4S' | 'Truck'
 

@@ -1,4 +1,4 @@
-import type { AlignmentData, CheckResult, DesignSpeed, RoadSurface, Standard, VehicleType } from '../types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, EmaxValue, RoadSurface, VehicleType } from '../types/geometry'
 import { getKValue, getMaxGrade, MIN_GRADE, MIN_VCL, getMinVerticalTangent, getVehicleCrestK, VEHICLE_PARAMS } from '../standards/austroads'
 import { UNSEALED_MAX_GRADE } from '../standards/unsealed'
 
@@ -8,7 +8,7 @@ const id = () => `v${++_id}`
 export function checkVerticalAlignment(
   data: AlignmentData,
   speed: DesignSpeed,
-  _standard: Standard,
+  _emax: EmaxValue,
   vehicleTypes: VehicleType[] = ['LME'],
   objectHeight: number = 0.2,
   roadSurface: RoadSurface = 'sealed',

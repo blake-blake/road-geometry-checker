@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { AlignmentData, CheckResult, DesignSpeed, RoadSurface, Standard, VehicleType } from './types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, EmaxValue, RoadSurface, VehicleType } from './types/geometry'
 import { parse12dHtml } from './parsers/parse12dHtml'
 import { checkHorizontalAlignment } from './checks/horizontalAlignment'
 import { checkVerticalAlignment } from './checks/verticalAlignment'
@@ -16,7 +16,7 @@ export default function App() {
   const [filename, setFilename] = useState('')
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
   const [designSpeed, setDesignSpeed]     = useState<DesignSpeed>(100)
-  const [standard, setStandard]           = useState<Standard>('mainroads_wa')
+  const [emax, setEmax]                   = useState<EmaxValue>(6)
   const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
   const [roadSurface, setRoadSurface]     = useState<RoadSurface>('sealed')
   const [objectHeight, setObjectHeight]   = useState<number>(0.2)
@@ -38,12 +38,12 @@ export default function App() {
   const allResults: CheckResult[] = useMemo(() => {
     if (!alignmentData) return []
     return [
-      ...checkHorizontalAlignment(alignmentData, designSpeed, standard),
-      ...checkVerticalAlignment(alignmentData, designSpeed, standard, vehicleTypes, objectHeight, roadSurface),
-      ...checkSuperelevation(alignmentData, designSpeed, standard),
+      ...checkHorizontalAlignment(alignmentData, designSpeed, emax),
+      ...checkVerticalAlignment(alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface),
+      ...checkSuperelevation(alignmentData, designSpeed, emax),
       ...checkChainages(alignmentData),
     ]
-  }, [alignmentData, designSpeed, standard, vehicleTypes, objectHeight, roadSurface])
+  }, [alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -63,7 +63,7 @@ export default function App() {
                 <p className="text-xs text-blue-300">{filename}</p>
               </div>
               <button
-                onClick={() => exportPdf(alignmentData, allResults, designSpeed, standard)}
+                onClick={() => exportPdf(alignmentData, allResults, designSpeed, emax)}
                 className="rounded-lg bg-white text-blue-900 px-3 py-1.5 text-xs font-semibold hover:bg-blue-50 transition-colors"
               >
                 Export PDF
@@ -110,12 +110,12 @@ export default function App() {
             {/* Settings */}
             <DesignSpeedSelector
               speed={designSpeed}
-              standard={standard}
+              emax={emax}
               vehicleTypes={vehicleTypes}
               roadSurface={roadSurface}
               objectHeight={objectHeight}
               onSpeedChange={setDesignSpeed}
-              onStandardChange={setStandard}
+              onEmaxChange={setEmax}
               onVehicleTypesChange={setVehicleTypes}
               onRoadSurfaceChange={setRoadSurface}
               onObjectHeightChange={setObjectHeight}

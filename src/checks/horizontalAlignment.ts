@@ -1,4 +1,4 @@
-import type { AlignmentData, CheckResult, DesignSpeed, Standard } from '../types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, EmaxValue } from '../types/geometry'
 import {
   getMinRadius, getMinCurveLength, getMinTransitionLength, getMinTangentBetweenCurves,
 } from '../standards/austroads'
@@ -9,17 +9,17 @@ const id = () => `h${++_id}`
 export function checkHorizontalAlignment(
   data: AlignmentData,
   speed: DesignSpeed,
-  standard: Standard,
+  emax: EmaxValue,
 ): CheckResult[] {
   _id = 0
   const results: CheckResult[] = []
   const { horizontalIPs } = data
   if (horizontalIPs.length === 0) return results
 
-  const minR = getMinRadius(speed, standard)
+  const minR = getMinRadius(speed, emax)
   const minCurveLen = getMinCurveLength(speed)
-  const emaxLabel = standard === 'mainroads_wa' ? 'emax=10%' : 'emax=7%'
-  const clause = standard === 'mainroads_wa'
+  const emaxLabel = `emax=${emax}%`
+  const clause = emax === 10
     ? 'AGRD03 Table 3.1 / MRWA Supplement'
     : 'AGRD03 Table 3.1'
 

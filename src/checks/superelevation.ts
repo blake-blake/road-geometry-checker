@@ -1,4 +1,4 @@
-import type { AlignmentData, CheckResult, DesignSpeed, Standard } from '../types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, EmaxValue } from '../types/geometry'
 import { getMaxSuperelevation, NORMAL_CROSSFALL } from '../standards/austroads'
 
 let _id = 0
@@ -7,17 +7,17 @@ const id = () => `s${++_id}`
 export function checkSuperelevation(
   data: AlignmentData,
   _speed: DesignSpeed,
-  standard: Standard,
+  emax: EmaxValue,
 ): CheckResult[] {
   _id = 0
   const results: CheckResult[] = []
   const { superelevation } = data
   if (superelevation.length === 0) return results
 
-  const maxSuper = getMaxSuperelevation(standard)
-  const clause = standard === 'mainroads_wa'
+  const maxSuper = getMaxSuperelevation(emax)
+  const clause = emax === 10
     ? 'AGRD03 Part 3 Sec 3.5 / MRWA Supplement (emax=10%)'
-    : 'AGRD03 Part 3 Section 3.5 (emax=7%)'
+    : `AGRD03 Part 3 Section 3.5 (emax=${emax}%)`
 
   for (let i = 0; i < superelevation.length; i++) {
     const pt = superelevation[i]

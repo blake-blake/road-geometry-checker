@@ -1,6 +1,6 @@
 # US-014 — Smart Defaults: emax and Object Height
 
-**Status:** 🔲 Planned
+**Status:** ✅ Complete
 
 ## Story
 

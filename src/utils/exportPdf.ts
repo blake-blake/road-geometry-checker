@@ -5,7 +5,7 @@
 
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { AlignmentData, CheckResult, CheckStatus, DesignSpeed, Standard } from '../types/geometry'
+import type { AlignmentData, CheckResult, CheckStatus, DesignSpeed, EmaxValue } from '../types/geometry'
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ export function exportPdf(
   data: AlignmentData,
   results: CheckResult[],
   designSpeed: DesignSpeed,
-  standard: Standard,
+  emax: EmaxValue,
 ): void {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW  = doc.internal.pageSize.getWidth()   // 297 mm
@@ -155,7 +155,7 @@ export function exportPdf(
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.text(
-    standard === 'mainroads_wa'
+    emax === 10
       ? 'Austroads AGRD Part 3  +  Main Roads WA Supplement'
       : 'Austroads Guide to Road Design — Part 3',
     margin, 23,
@@ -172,7 +172,7 @@ export function exportPdf(
   doc.setTextColor(...C.slate)
   const meta = [
     `Design Speed: ${designSpeed} km/h`,
-    `Standard: ${standard === 'mainroads_wa' ? 'Main Roads WA (emax = 10%)' : 'Austroads (emax = 7%)'}`,
+    `emax: ${emax}%`,
     `Chainage Range: ${data.startChainage.toFixed(0)} – ${data.endChainage.toFixed(0)} m`,
     `Date: ${date}`,
   ]
