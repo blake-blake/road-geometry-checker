@@ -19,7 +19,7 @@ export default function App() {
   const [emax, setEmax]                   = useState<EmaxValue>(6)
   const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
   const [roadSurface, setRoadSurface]     = useState<RoadSurface>('sealed')
-  const [objectHeight, setObjectHeight]   = useState<number>(0.2)
+  const [objectHeight, setObjectHeight]   = useState<number>(0)
   const [ipSpeedOverrides, setIpSpeedOverrides] = useState<Record<string, DesignSpeed>>({})
 
   function handleFile(content: string, name: string) {
