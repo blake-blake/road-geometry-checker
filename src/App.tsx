@@ -63,7 +63,7 @@ export default function App() {
       <header className="bg-blue-900 text-white shadow-lg">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Road Geometry Checker</h1>
+            <h1 className="text-xl font-bold tracking-tight">Road Geometry Checker 1.1</h1>
             <p className="text-xs text-blue-300 mt-0.5">
               Austroads AGRD Part 3 &amp; Main Roads WA Supplement
             </p>
