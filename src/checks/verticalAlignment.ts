@@ -1,5 +1,6 @@
-import type { AlignmentData, CheckResult, DesignSpeed, Standard } from '../types/geometry'
-import { getKValue, getMaxGrade, MIN_GRADE, MIN_VCL, getMinVerticalTangent } from '../standards/austroads'
+import type { AlignmentData, CheckResult, DesignSpeed, EmaxValue, RoadSurface, VehicleType } from '../types/geometry'
+import { getKValue, getMaxGrade, MIN_GRADE, MIN_VCL, getMinVerticalTangent, getVehicleCrestK, VEHICLE_PARAMS } from '../standards/austroads'
+import { UNSEALED_MAX_GRADE } from '../standards/unsealed'
 
 let _id = 0
 const id = () => `v${++_id}`
@@ -7,14 +8,19 @@ const id = () => `v${++_id}`
 export function checkVerticalAlignment(
   data: AlignmentData,
   speed: DesignSpeed,
-  _standard: Standard,
+  _emax: EmaxValue,
+  vehicleTypes: VehicleType[] = ['LME'],
+  objectHeight: number = 0.2,
+  roadSurface: RoadSurface = 'sealed',
+  ipSpeedOverrides: Record<string, DesignSpeed> = {},
 ): CheckResult[] {
   _id = 0
   const results: CheckResult[] = []
   const { verticalIPs, gradeSections } = data
   if (verticalIPs.length === 0) return results
 
-  const maxGrade = getMaxGrade(speed)
+  const maxGrade = roadSurface === 'unsealed' ? UNSEALED_MAX_GRADE[speed] : getMaxGrade(speed)
+  const gradeClause = roadSurface === 'unsealed' ? 'ARRB Unsealed Road Guide' : 'AGRD03 Table 9.1'
 
   // ── Grade section checks ──────────────────────────────────────────────────
   for (const section of gradeSections) {
@@ -29,7 +35,7 @@ export function checkVerticalAlignment(
       value: `${absGrade.toFixed(2)}%`,
       limit: `≤ ${maxGrade}%`,
       status: absGrade <= maxGrade ? 'pass' : 'fail',
-      clause: 'AGRD03 Table 9.1',
+      clause: gradeClause,
     })
 
     results.push({
@@ -52,7 +58,8 @@ export function checkVerticalAlignment(
     if (prev.vcLength === 0 && curr.vcLength === 0) continue
 
     const tangentBetween = curr.chainage - curr.vcLength / 2 - (prev.chainage + prev.vcLength / 2)
-    const minT = getMinVerticalTangent(speed)
+    const currSpeed = ipSpeedOverrides[curr.id] ?? speed
+    const minT = getMinVerticalTangent(currSpeed)
 
     if (tangentBetween < minT.desirable) {
       results.push({
@@ -75,35 +82,90 @@ export function checkVerticalAlignment(
   for (const vip of verticalIPs) {
     if (vip.vcType === 'none' || vip.vcLength === 0) continue
 
+    const vipSpeed = ipSpeedOverrides[vip.id] ?? speed
     const label = `VIP ${vip.id}`
-    const kReq  = getKValue(speed, vip.vcType)
     const clause = 'AGRD03 Table 9.1 & 9.2'
 
-    // K value — absolute minimum
-    results.push({
-      id: id(),
-      category: 'Vertical Alignment',
-      element: label,
-      check: `K value — ${vip.vcType} (absolute minimum)`,
-      value: `K = ${vip.kValue.toFixed(1)}`,
-      limit: `≥ K${kReq.absolute}`,
-      status: vip.kValue >= kReq.absolute ? 'pass' : 'fail',
-      clause,
-    })
+    // ── Crest K — compute worst required K across all selected vehicle types ──
+    if (vip.vcType === 'crest') {
+      // Find which vehicle type demands the highest (most conservative) K
+      let worstK = { absolute: 0, desirable: 0, controlledBy: 'LME' as VehicleType }
+      for (const vt of vehicleTypes) {
+        const kv = getVehicleCrestK(vipSpeed, vt, objectHeight, roadSurface)
+        if (kv.absolute > worstK.absolute) {
+          worstK = { ...kv, controlledBy: vt }
+        }
+      }
+      const vtLabel = vehicleTypes.length > 1 ? ` [${VEHICLE_PARAMS[worstK.controlledBy].label}]` : ''
+      const h2Label = `h₂=${objectHeight}m`
 
-    // K value — desirable
-    if (vip.kValue >= kReq.absolute && vip.kValue < kReq.desirable) {
       results.push({
         id: id(),
         category: 'Vertical Alignment',
         element: label,
-        check: `K value — ${vip.vcType} (desirable)`,
+        check: 'K value — crest (absolute minimum)',
         value: `K = ${vip.kValue.toFixed(1)}`,
-        limit: `≥ K${kReq.desirable}`,
-        status: 'warning',
+        limit: `≥ K${worstK.absolute} (${h2Label})`,
+        status: vip.kValue >= worstK.absolute ? 'pass' : 'fail',
         clause,
-        notes: 'K value meets absolute but not desirable minimum. Justification required.',
+        notes: vehicleTypes.length > 1 ? `Controlled by ${VEHICLE_PARAMS[worstK.controlledBy].label}${vtLabel}` : undefined,
       })
+
+      if (vip.kValue >= worstK.absolute && vip.kValue < worstK.desirable) {
+        results.push({
+          id: id(),
+          category: 'Vertical Alignment',
+          element: label,
+          check: 'K value — crest (desirable)',
+          value: `K = ${vip.kValue.toFixed(1)}`,
+          limit: `≥ K${worstK.desirable} (${h2Label})`,
+          status: 'warning',
+          clause,
+          notes: 'K value meets absolute but not desirable minimum. Justification required.',
+        })
+      }
+
+      // Indicative sight distance
+      const impliedSSD = Math.sqrt(vip.kValue * vip.gradeChange * vip.vcLength)
+      results.push({
+        id: id(),
+        category: 'Vertical Alignment',
+        element: label,
+        check: 'Crest curve — sight distance adequacy (indicative)',
+        value: `L=${vip.vcLength.toFixed(0)}m, K=${vip.kValue.toFixed(1)}, A=${vip.gradeChange.toFixed(2)}%`,
+        limit: `K ≥ ${worstK.absolute} (SSD ≈ ${impliedSSD.toFixed(0)} m)`,
+        status: vip.kValue >= worstK.absolute ? 'pass' : 'fail',
+        clause: 'AGRD03 Section 9.3',
+        notes: 'Sight distance calculation is indicative. Full AGRD03 Appendix A check recommended.',
+      })
+    }
+
+    // ── Sag K — comfort criterion, same for all vehicle types ─────────────────
+    if (vip.vcType === 'sag') {
+      const kReq = getKValue(vipSpeed, 'sag')
+      results.push({
+        id: id(),
+        category: 'Vertical Alignment',
+        element: label,
+        check: 'K value — sag (absolute minimum)',
+        value: `K = ${vip.kValue.toFixed(1)}`,
+        limit: `≥ K${kReq.absolute}`,
+        status: vip.kValue >= kReq.absolute ? 'pass' : 'fail',
+        clause,
+      })
+      if (vip.kValue >= kReq.absolute && vip.kValue < kReq.desirable) {
+        results.push({
+          id: id(),
+          category: 'Vertical Alignment',
+          element: label,
+          check: 'K value — sag (desirable)',
+          value: `K = ${vip.kValue.toFixed(1)}`,
+          limit: `≥ K${kReq.desirable}`,
+          status: 'warning',
+          clause,
+          notes: 'K value meets absolute but not desirable minimum. Justification required.',
+        })
+      }
     }
 
     // Minimum vertical curve length
@@ -130,23 +192,6 @@ export function checkVerticalAlignment(
         status: 'warning',
         clause: 'AGRD03 Section 9.4',
         notes: 'Very small grade change — confirm vertical curve is necessary.',
-      })
-    }
-
-    // Crest — derived sight distance from K value
-    if (vip.vcType === 'crest') {
-      // SSD from crest curve: SSD = L/2 + ... simplified check via K × A
-      const impliedSSD = Math.sqrt(vip.kValue * vip.gradeChange * vip.vcLength)
-      results.push({
-        id: id(),
-        category: 'Vertical Alignment',
-        element: label,
-        check: 'Crest curve — sight distance adequacy (indicative)',
-        value: `L=${vip.vcLength.toFixed(0)}m, K=${vip.kValue.toFixed(1)}, A=${vip.gradeChange.toFixed(2)}%`,
-        limit: `K ≥ ${kReq.absolute} (provides SSD ≈ ${impliedSSD.toFixed(0)} m)`,
-        status: vip.kValue >= kReq.absolute ? 'pass' : 'fail',
-        clause: 'AGRD03 Section 9.3',
-        notes: 'Sight distance calculation is indicative. Full AGRD03 Appendix A check recommended.',
       })
     }
   }

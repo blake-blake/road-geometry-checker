@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { AlignmentData, CheckResult, DesignSpeed, Standard } from './types/geometry'
+import type { AlignmentData, CheckResult, DesignSpeed, EmaxValue, RoadSurface, VehicleType } from './types/geometry'
 import { parse12dHtml } from './parsers/parse12dHtml'
 import { checkHorizontalAlignment } from './checks/horizontalAlignment'
 import { checkVerticalAlignment } from './checks/verticalAlignment'
@@ -15,14 +15,19 @@ export default function App() {
   const [alignmentData, setAlignmentData] = useState<AlignmentData | null>(null)
   const [filename, setFilename] = useState('')
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
-  const [designSpeed, setDesignSpeed] = useState<DesignSpeed>(100)
-  const [standard, setStandard]       = useState<Standard>('mainroads_wa')
+  const [designSpeed, setDesignSpeed]     = useState<DesignSpeed>(100)
+  const [emax, setEmax]                   = useState<EmaxValue>(6)
+  const [vehicleTypes, setVehicleTypes]   = useState<VehicleType[]>(['LME'])
+  const [roadSurface, setRoadSurface]     = useState<RoadSurface>('sealed')
+  const [objectHeight, setObjectHeight]   = useState<number>(0.2)
+  const [ipSpeedOverrides, setIpSpeedOverrides] = useState<Record<string, DesignSpeed>>({})
 
   function handleFile(content: string, name: string) {
     const data = parse12dHtml(content)
     setFilename(name)
     setAlignmentData(data)
     setParseWarnings(data.parseWarnings)
+    setIpSpeedOverrides({})
     if (data.designSpeed) setDesignSpeed(data.designSpeed)
   }
 
@@ -30,17 +35,27 @@ export default function App() {
     setAlignmentData(null)
     setFilename('')
     setParseWarnings([])
+    setIpSpeedOverrides({})
+  }
+
+  function handleSpeedOverride(ipId: string, overrideSpeed: DesignSpeed | null) {
+    setIpSpeedOverrides(prev => {
+      const next = { ...prev }
+      if (overrideSpeed === null) delete next[ipId]
+      else next[ipId] = overrideSpeed
+      return next
+    })
   }
 
   const allResults: CheckResult[] = useMemo(() => {
     if (!alignmentData) return []
     return [
-      ...checkHorizontalAlignment(alignmentData, designSpeed, standard),
-      ...checkVerticalAlignment(alignmentData, designSpeed, standard),
-      ...checkSuperelevation(alignmentData, designSpeed, standard),
+      ...checkHorizontalAlignment(alignmentData, designSpeed, emax, ipSpeedOverrides),
+      ...checkVerticalAlignment(alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface, ipSpeedOverrides),
+      ...checkSuperelevation(alignmentData, designSpeed, emax),
       ...checkChainages(alignmentData),
     ]
-  }, [alignmentData, designSpeed, standard])
+  }, [alignmentData, designSpeed, emax, vehicleTypes, objectHeight, roadSurface, ipSpeedOverrides])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -48,7 +63,7 @@ export default function App() {
       <header className="bg-blue-900 text-white shadow-lg">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Road Geometry Checker</h1>
+            <h1 className="text-xl font-bold tracking-tight">Road Geometry Checker 1.1</h1>
             <p className="text-xs text-blue-300 mt-0.5">
               Austroads AGRD Part 3 &amp; Main Roads WA Supplement
             </p>
@@ -60,7 +75,7 @@ export default function App() {
                 <p className="text-xs text-blue-300">{filename}</p>
               </div>
               <button
-                onClick={() => exportPdf(alignmentData, allResults, designSpeed, standard)}
+                onClick={() => exportPdf(alignmentData, allResults, designSpeed, emax)}
                 className="rounded-lg bg-white text-blue-900 px-3 py-1.5 text-xs font-semibold hover:bg-blue-50 transition-colors"
               >
                 Export PDF
@@ -107,9 +122,15 @@ export default function App() {
             {/* Settings */}
             <DesignSpeedSelector
               speed={designSpeed}
-              standard={standard}
+              emax={emax}
+              vehicleTypes={vehicleTypes}
+              roadSurface={roadSurface}
+              objectHeight={objectHeight}
               onSpeedChange={setDesignSpeed}
-              onStandardChange={setStandard}
+              onEmaxChange={setEmax}
+              onVehicleTypesChange={setVehicleTypes}
+              onRoadSurfaceChange={setRoadSurface}
+              onObjectHeightChange={setObjectHeight}
             />
 
             {/* Alignment info */}
@@ -127,7 +148,13 @@ export default function App() {
             <CheckSummary results={allResults} />
 
             {/* IP matrix */}
-            <IPMatrixTable data={alignmentData} results={allResults} />
+            <IPMatrixTable
+              data={alignmentData}
+              results={allResults}
+              speed={designSpeed}
+              ipSpeedOverrides={ipSpeedOverrides}
+              onSpeedOverride={handleSpeedOverride}
+            />
           </>
         )}
       </main>
